@@ -1,4 +1,6 @@
-<img src="public/stigbee-maxi.png" width="600" alt="STIG Bee Logo">
+<div align="center">
+  <img src="public/stigbee-maxi.png" width="200" alt="STIG Bee Logo">
+</div>
 
 # STIG Bee 
 
