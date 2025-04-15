@@ -35,8 +35,17 @@ type Severity = "high" | "medium" | "low" | "unknown";
 type SortField = "title" | "severity" | "id";
 type SortOrder = "asc" | "desc";
 type GroupBy = "severity" | "none";
-type StatusFilter = "all" | "not applicable" | "not finding" | "open" | "default";
+type StatusValue = "Open" | "NotAFinding" | "Not_Applicable" | "Not_Reviewed";
+type StatusFilter = "all" | StatusValue;
 type FileType = "xml" | "ckl" | null;
+
+// // Status mapping for display values
+// const STATUS_MAPPING = {
+//   "Open": "Open",
+//   "NotAFinding": "Not a Finding",
+//   "Not_Applicable": "Not Applicable",
+//   "Not_Reviewed": "Not Reviewed"
+// } as const;
 
 interface Ident {
   "#text": string;
@@ -66,7 +75,7 @@ interface Group {
   description: string;
   Rule: Rule;
   "@_id": string;
-  status?: "not applicable" | "not finding" | "open" | "default";
+  status?: StatusValue;
   findingDetails?: string;
   comments?: string;
 }
@@ -88,7 +97,7 @@ interface ParsedXml {
 interface StatisticsCardProps {
   groups: Group[];
   groupFields: Record<string, {
-    status: "not applicable" | "not finding" | "open" | "default";
+    status: StatusValue;
     findingDetails: string;
     comments: string;
   }>;
@@ -99,10 +108,10 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
   const severityData = groups.reduce((acc, group) => {
     const severity = group.Rule["@_severity"] || "unknown";
     const groupId = group["@_id"];
-    const status = groupFields[groupId]?.status || "default";
+    const status = groupFields[groupId]?.status || "Not_Reviewed";
     
-    // Only count findings that are still "open"
-    if (status === "open") {
+    // Only count findings that are still "Open"
+    if (status === "Open") {
       acc[severity] = (acc[severity] || 0) + 1;
     }
     return acc;
@@ -110,7 +119,7 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
 
   const statusData = groups.reduce((acc, group) => {
     const groupId = group["@_id"];
-    const status = groupFields[groupId]?.status || "default";
+    const status = groupFields[groupId]?.status || "Not_Reviewed";
     acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -135,10 +144,10 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
   };
 
   const statusColors = {
-    open: "#ef4444",
-    "not finding": "#22c55e",
-    "not applicable": "#6b7280",
-    "default": "#94a3b8",
+    Open: "#ef4444",
+    NotAFinding: "#22c55e",
+    Not_Applicable: "#6b7280",
+    Not_Reviewed: "#94a3b8"
   };
 
   return (
@@ -221,7 +230,7 @@ export function XmlViewer() {
   
   // New state for editable fields
   const [groupFields, setGroupFields] = useState<Record<string, {
-    status: "not applicable" | "not finding" | "open" | "default";
+    status: StatusValue;
     findingDetails: string;
     comments: string;
   }>>({});
@@ -283,7 +292,7 @@ export function XmlViewer() {
       // Initialize groupFields with data from CKL if available
       if (parsedData.Benchmark && parsedData.Benchmark.Group) {
         const initialGroupFields: Record<string, {
-          status: "not applicable" | "not finding" | "open" | "default";
+          status: StatusValue;
           findingDetails: string;
           comments: string;
         }> = {};
@@ -292,7 +301,7 @@ export function XmlViewer() {
           const groupId = group["@_id"];
           if (group.status || group.findingDetails || group.comments) {
             initialGroupFields[groupId] = {
-              status: group.status || "default",
+              status: group.status || "Not_Reviewed",
               findingDetails: group.findingDetails || "",
               comments: group.comments || ""
             };
@@ -392,13 +401,8 @@ export function XmlViewer() {
     if (statusFilter !== "all") {
       filteredGroups = filteredGroups.filter(group => {
         const groupId = group["@_id"];
-        const status = group.status || groupFields[groupId]?.status;
-        
-        if (statusFilter === "default") {
-          return !status;
-        } else {
-          return status === statusFilter;
-        }
+        const status = group.status || groupFields[groupId]?.status || "Not_Reviewed";
+        return status === statusFilter;
       });
     }
     
@@ -440,7 +444,7 @@ export function XmlViewer() {
 
   // Function to save changes for a specific group
   const saveChanges = useCallback((groupId: string, changes: {
-    status?: "not applicable" | "not finding" | "open" | "default";
+    status?: StatusValue;
     findingDetails?: string;
     comments?: string;
   }) => {
@@ -469,7 +473,7 @@ export function XmlViewer() {
     if (!findingDetailsTextarea || !commentsTextarea) return;
     
     // Get the current status from the groupFields state
-    const currentStatus = groupFields[groupId]?.status || "default";
+    const currentStatus = groupFields[groupId]?.status || "Not_Reviewed";
     
     const changes = {
       status: currentStatus,
@@ -552,7 +556,7 @@ export function XmlViewer() {
       // Initialize groupFields with data from the parsed XML
       if (result.parsedXml.Benchmark.Group) {
         const initialGroupFields: Record<string, {
-          status: "not applicable" | "not finding" | "open" | "default";
+          status: StatusValue;
           findingDetails: string;
           comments: string;
         }> = {};
@@ -560,7 +564,7 @@ export function XmlViewer() {
         result.parsedXml.Benchmark.Group.forEach((group: Group) => {
           const groupId = group["@_id"];
           initialGroupFields[groupId] = {
-            status: group.status || "default",
+            status: group.status || "Not_Reviewed",
             findingDetails: group.findingDetails || "",
             comments: group.comments || ""
           };
@@ -603,7 +607,7 @@ export function XmlViewer() {
     
     // Use status from the group object if available, otherwise use from groupFields
     const currentFields = {
-      status: group.status || groupFields[groupId]?.status || "default",
+      status: group.status || groupFields[groupId]?.status || "Not_Reviewed",
       findingDetails: group.findingDetails || groupFields[groupId]?.findingDetails || "",
       comments: group.comments || groupFields[groupId]?.comments || ""
     };
@@ -683,17 +687,17 @@ export function XmlViewer() {
                     value={currentFields.status}
                     onValueChange={(value) => {
                       markCardAsChanged(groupId);
-                      saveChanges(groupId, { status: value as "not applicable" | "not finding" | "open" | "default" });
+                      saveChanges(groupId, { status: value as StatusValue });
                     }}
                   >
                     <SelectTrigger id={`status-${groupId}`} className="w-full">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent className="w-full">
-                      <SelectItem value="default">Default</SelectItem>
-                      <SelectItem value="not applicable">Not Applicable</SelectItem>
-                      <SelectItem value="not finding">Not Finding</SelectItem>
-                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="Open">Open</SelectItem>
+                      <SelectItem value="NotAFinding">Not a Finding</SelectItem>
+                      <SelectItem value="Not_Applicable">Not Applicable</SelectItem>
+                      <SelectItem value="Not_Reviewed">Not Reviewed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -999,10 +1003,10 @@ export function XmlViewer() {
                       </SelectTrigger>
                       <SelectContent className="w-full">
                         <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="default">Default</SelectItem>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="not finding">Not Finding</SelectItem>
-                        <SelectItem value="not applicable">Not Applicable</SelectItem>
+                        <SelectItem value="Open">Open</SelectItem>
+                        <SelectItem value="NotAFinding">Not a Finding</SelectItem>
+                        <SelectItem value="Not_Applicable">Not Applicable</SelectItem>
+                        <SelectItem value="Not_Reviewed">Not Reviewed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

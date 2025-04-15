@@ -279,7 +279,7 @@ export function convertCklToXmlString(cklData: CklData): string {
         <STIG_VIEWER_VERSION>${escapeXml(cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.STIG_VIEWER_VERSION)}</STIG_VIEWER_VERSION>
       </STIG_INFO>
       ${cklData.CHECKLIST.STIGS.iSTIG.VULN.map(vuln => `
-      <VULN status="${escapeXml(vuln["@_status"])}">
+      <VULN>
         ${vuln.STIG_DATA.map(data => `
         <STIG_DATA>
           <VULN_ATTRIBUTE>${escapeXml(data.VULN_ATTRIBUTE)}</VULN_ATTRIBUTE>

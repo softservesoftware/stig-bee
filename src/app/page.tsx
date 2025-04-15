@@ -84,7 +84,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4 md:px-8 bg-slate-900">
+      <section className="py-20 px-4 md:px-8 bg-slate-950">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">
             <span className="text-white">Why Choose </span>
@@ -132,7 +132,7 @@ export default function Home() {
       
 
       {/* CTA Section */}
-      <section className="py-20 px-4 md:px-8 bg-slate-900">
+      <section className="py-20 px-4 md:px-8 bg-slate-950">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">
             <span className="text-white">Ready to Transform Your </span>
