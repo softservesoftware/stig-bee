@@ -1,4 +1,6 @@
-# STIG Bee 🐝
+<img src="public/stigbee-maxi.png" width="600" alt="STIG Bee Logo">
+
+# STIG Bee 
 
 STIG Bee is an open-source tool that takes the sting out of STIGs (Security Technical Implementation Guides). It provides a user-friendly interface for managing and implementing security controls, making compliance more accessible and manageable.
 
