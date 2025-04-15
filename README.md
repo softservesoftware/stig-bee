@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/logo-white.png" width="200" alt="STIG Bee Logo" style="border-radius: 25px;">
+  <img src="public/logo-black.png" width="200" alt="STIG Bee Logo" style="border-radius: 25px;">
 </div>
 
 # STIG Bee 
