@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -224,6 +224,9 @@ export function XmlViewer() {
   // Track which cards have unsaved changes
   const [cardsWithChanges, setCardsWithChanges] = useState<Set<string>>(new Set());
 
+  // New state for debouncing
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
   // Load saved data from localStorage on component mount
   useEffect(() => {
     const savedXmlContent = localStorage.getItem("xmlContent");
@@ -303,16 +306,79 @@ export function XmlViewer() {
     localStorage.setItem("groupFields", JSON.stringify(groupFields));
   }, [groupFields]);
 
-  // // Function to update group fields
-  // const updateGroupField = (groupId: string, field: 'status' | 'findingDetails' | 'comments', value: string) => {
-  //   setGroupFields(prev => ({
-  //     ...prev,
-  //     [groupId]: {
-  //       ...prev[groupId],
-  //       [field]: value
-  //     }
-  //   }));
-  // };
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Memoize filtered and sorted groups
+  const filteredAndSortedGroups = useMemo(() => {
+    if (!parsedXml?.Benchmark?.Group) return [];
+    
+    let filteredGroups = [...parsedXml.Benchmark.Group];
+    
+    // Apply search filter
+    if (debouncedSearchTerm) {
+      const term = debouncedSearchTerm.toLowerCase();
+      filteredGroups = filteredGroups.filter(group => 
+        group.title.toLowerCase().includes(term) || 
+        group.Rule.title.toLowerCase().includes(term) ||
+        (typeof group.Rule.description === 'string' && 
+         group.Rule.description.toLowerCase().includes(term))
+      );
+    }
+    
+    // Apply severity filter
+    if (severityFilter !== "all") {
+      filteredGroups = filteredGroups.filter(group => 
+        group.Rule["@_severity"] === severityFilter
+      );
+    }
+    
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filteredGroups = filteredGroups.filter(group => {
+        const groupId = group["@_id"];
+        const status = group.status || groupFields[groupId]?.status;
+        
+        if (statusFilter === "default") {
+          return !status;
+        } else {
+          return status === statusFilter;
+        }
+      });
+    }
+    
+    // Apply sorting
+    filteredGroups.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case "title":
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case "severity":
+          const severityOrder = { high: 0, medium: 1, low: 2, unknown: 3 };
+          const severityA = a.Rule["@_severity"] || "unknown";
+          const severityB = b.Rule["@_severity"] || "unknown";
+          comparison = (severityOrder[severityA] || 3) - (severityOrder[severityB] || 3);
+          break;
+        case "id":
+          comparison = a["@_id"].localeCompare(b["@_id"]);
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+    
+    return filteredGroups;
+  }, [parsedXml?.Benchmark?.Group, debouncedSearchTerm, severityFilter, statusFilter, sortField, sortOrder, groupFields]);
 
   // Function to mark a card as having changes
   const markCardAsChanged = (groupId: string) => {
@@ -440,78 +506,6 @@ export function XmlViewer() {
     }
   };
 
-  // Function to filter and sort groups
-  const getFilteredAndSortedGroups = () => {
-    if (!parsedXml?.Benchmark?.Group) return [];
-    
-    let filteredGroups = [...parsedXml.Benchmark.Group];
-    
-    // Apply search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filteredGroups = filteredGroups.filter(group => 
-        group.title.toLowerCase().includes(term) || 
-        group.Rule.title.toLowerCase().includes(term) ||
-        (typeof group.Rule.description === 'string' && 
-         group.Rule.description.toLowerCase().includes(term))
-      );
-      console.log(`Filtered by search term "${searchTerm}": ${filteredGroups.length} results`);
-    }
-    
-    // Apply severity filter
-    if (severityFilter !== "all") {
-      filteredGroups = filteredGroups.filter(group => 
-        group.Rule["@_severity"] === severityFilter
-      );
-      console.log(`Filtered by severity "${severityFilter}": ${filteredGroups.length} results`);
-    }
-    
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filteredGroups = filteredGroups.filter(group => {
-        const groupId = group["@_id"];
-        // Use status from the group object if available, otherwise use from groupFields
-        const status = group.status || groupFields[groupId]?.status;
-        
-        if (statusFilter === "default") {
-          // Show items that don't have a status set yet
-          return !status;
-        } else {
-          // Show items with the selected status
-          return status === statusFilter;
-        }
-      });
-      console.log(`Filtered by status "${statusFilter}": ${filteredGroups.length} results`);
-    }
-    
-    // Apply sorting
-    filteredGroups.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortField) {
-        case "title":
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case "severity":
-          const severityOrder = { high: 0, medium: 1, low: 2, unknown: 3 };
-          const severityA = a.Rule["@_severity"] || "unknown";
-          const severityB = b.Rule["@_severity"] || "unknown";
-          comparison = (severityOrder[severityA] || 3) - (severityOrder[severityB] || 3);
-          break;
-        case "id":
-          comparison = a["@_id"].localeCompare(b["@_id"]);
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
-    
-    console.log(`Sorted by ${sortField} in ${sortOrder} order`);
-    return filteredGroups;
-  };
-
   // Function to get severity color
   const getSeverityColor = (severity: Severity | undefined) => {
     switch (severity) {
@@ -526,37 +520,8 @@ export function XmlViewer() {
     }
   };
 
-  // Function to render groups based on grouping
-  const renderGroups = () => {
-    const filteredGroups = getFilteredAndSortedGroups();
-    
-    if (groupBy === "none") {
-      return filteredGroups.map((group) => renderGroupCard(group));
-    }
-    
-    // Group by severity
-    const groupedBySeverity: Record<string, Group[]> = {};
-    
-    filteredGroups.forEach(group => {
-      const severity = group.Rule["@_severity"] || "unknown";
-      if (!groupedBySeverity[severity]) {
-        groupedBySeverity[severity] = [];
-      }
-      groupedBySeverity[severity].push(group);
-    });
-    
-    return Object.entries(groupedBySeverity).map(([severity, groups]) => (
-      <div key={severity} className="mb-6">
-        <h3 className="text-xl font-bold mb-3 capitalize">{severity} Severity</h3>
-        <div className="space-y-4">
-          {groups.map(group => renderGroupCard(group))}
-        </div>
-      </div>
-    ));
-  };
-
   // Function to render a single group card
-  const renderGroupCard = (group: Group) => {
+  const renderGroupCard = useCallback((group: Group) => {
     const groupId = group["@_id"];
     
     // Use status from the group object if available, otherwise use from groupFields
@@ -695,7 +660,34 @@ export function XmlViewer() {
         </CardContent>
       </Card>
     );
-  };
+  }, [groupFields, cardsWithChanges, saveChanges, markCardAsChanged]);
+
+  // Function to render groups based on grouping
+  const renderGroups = useCallback(() => {
+    if (groupBy === "none") {
+      return filteredAndSortedGroups.map((group) => renderGroupCard(group));
+    }
+    
+    // Group by severity
+    const groupedBySeverity: Record<string, Group[]> = {};
+    
+    filteredAndSortedGroups.forEach(group => {
+      const severity = group.Rule["@_severity"] || "unknown";
+      if (!groupedBySeverity[severity]) {
+        groupedBySeverity[severity] = [];
+      }
+      groupedBySeverity[severity].push(group);
+    });
+    
+    return Object.entries(groupedBySeverity).map(([severity, groups]) => (
+      <div key={severity} className="mb-6">
+        <h3 className="text-xl font-bold mb-3 capitalize">{severity} Severity</h3>
+        <div className="space-y-4">
+          {groups.map(group => renderGroupCard(group))}
+        </div>
+      </div>
+    ));
+  }, [filteredAndSortedGroups, groupBy, renderGroupCard]);
 
   // Function to convert to CKL format
   const convertToCkl = (data: ParsedXml) => {
@@ -1092,7 +1084,7 @@ export function XmlViewer() {
                 <Badge>{parsedXml.Benchmark.reference["#text"]} {parsedXml.Benchmark.reference["@_href"]}</Badge>
               </div>
               <div className="mt-4">
-                <h3 className="text-lg font-medium">Results ({getFilteredAndSortedGroups().length} of {parsedXml.Benchmark.Group.length})</h3>
+                <h3 className="text-lg font-medium">Results ({filteredAndSortedGroups.length} of {parsedXml.Benchmark.Group.length})</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {parsedXml.Benchmark.Group.filter(group => !groupFields[group["@_id"]]?.status).length} findings with default status
                 </p>
