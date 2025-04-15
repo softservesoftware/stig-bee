@@ -1,4 +1,5 @@
-// eslint-disable-file @typescript-eslint/no-explicit-any  
+// eslint-disable-file @typescript-eslint/no-explicit-any
+// eslint-disable-file @typescript-eslint/no-unused-vars
 "use server";
 
 import { XMLParser } from "fast-xml-parser";
@@ -21,22 +22,12 @@ interface StigInfo {
   VERSION: string;
   RELEASE_INFO: string;
   SOURCE: string;
+  STIG_ID?: string;
+  DESCRIPTION?: string;
 }
 
 interface Asset {
   TARGET_COMMENT: string;
-}
-
-interface CklData {
-  CHECKLIST: {
-    STIGS: {
-      iSTIG: {
-        STIG_INFO: StigInfo;
-        VULN: Vulnerability[];
-      };
-    };
-    ASSET: Asset;
-  };
 }
 
 export async function uploadXmlFile(formData: FormData) {
@@ -76,7 +67,7 @@ export async function uploadXmlFile(formData: FormData) {
       if (parsedXml.CHECKLIST) {
         try {
           // Transform CKL to our expected format
-          const transformedXml = transformCklToXml(parsedXml);
+          const transformedXml = await transformCklToXml(parsedXml);
           
           // Validate the transformed XML
           if (!transformedXml.Benchmark || !transformedXml.Benchmark.Group) {
@@ -111,123 +102,97 @@ export async function uploadXmlFile(formData: FormData) {
   }
 }
 
-// Function to transform CKL format to our expected XML format
-function transformCklToXml(cklData: CklData): ParsedXml {
-  try {
-    // Validate the CKL data structure
-    if (!cklData.CHECKLIST || !cklData.CHECKLIST.STIGS || !cklData.CHECKLIST.STIGS.iSTIG) {
-      throw new Error("Invalid CKL structure: Missing required elements");
-    }
-    
-    // Extract STIG information
-    const stigInfo = cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO;
-    const asset = cklData.CHECKLIST.ASSET;
-    
-    if (!stigInfo || !asset) {
-      throw new Error("Invalid CKL structure: Missing STIG_INFO or ASSET");
-    }
-    
-    // Create a Benchmark object that matches our expected format
-    const benchmark = {
-      title: stigInfo.TITLE || "Unknown STIG",
-      description: asset.TARGET_COMMENT || "",
-      "plain-text": { "#text": stigInfo.VERSION || "Unknown Version" },
-      status: { 
-        "#text": stigInfo.RELEASE_INFO || "Unknown Release", 
-        "@_date": new Date().toISOString().split('T')[0] 
-      },
-      reference: { 
-        "#text": stigInfo.SOURCE || "Unknown Source", 
-        "@_href": "" 
-      },
-      Group: [] as Array<{
-        title: string;
-        description: string;
-        "@_id": string;
-        status?: string;
-        findingDetails?: string;
-        comments?: string;
-        Rule: {
-          version: string;
-          title: string;
-          description: string;
-          reference: string;
-          ident: any;
-          fixtext: any;
-          fix: any;
-          check: any;
-          "@_id": string;
-          "@_weight": number;
-          "@_severity": string;
-        };
-      }>
+export async function transformCklToXml(cklData: {
+  CHECKLIST: {
+    STIGS: {
+      iSTIG: {
+        STIG_INFO: StigInfo;
+        VULN: Vulnerability[];
+      };
     };
-    
-    // Process vulnerabilities
-    const vulns = cklData.CHECKLIST.STIGS.iSTIG.VULN;
-    if (Array.isArray(vulns)) {
-      benchmark.Group = vulns.map((vuln) => {
-        // Extract STIG data
-        const stigData = vuln.STIG_DATA;
-        const vulnData: Record<string, string> = {};
-        
-        // Convert STIG_DATA to a more usable format
-        if (Array.isArray(stigData)) {
-          stigData.forEach((data) => {
-            if (data.VULN_ATTRIBUTE && data.ATTRIBUTE_DATA) {
-              vulnData[data.VULN_ATTRIBUTE] = data.ATTRIBUTE_DATA;
-            }
-          });
-        }
-        
-        // Extract status, finding details, and comments
-        const status = vuln.STATUS ? mapStatus(vuln.STATUS) : "default";
-        const findingDetails = vuln.FINDING_DETAILS || "";
-        const comments = vuln.COMMENTS || "";
-        
-        // Create a Group object that matches our expected format
-        return {
-          title: vulnData.Group_Title || "Unknown Group",
-          description: vulnData.Vuln_Discuss || "",
-          "@_id": vulnData.Vuln_Num || `V-${Math.floor(Math.random() * 10000)}`,
-          status: status,
-          findingDetails: findingDetails,
-          comments: comments,
-          Rule: {
-            version: vulnData.Rule_Ver || "1.0",
-            title: vulnData.Rule_Title || "Unknown Rule",
-            description: vulnData.Vuln_Discuss || "",
-            reference: vulnData.Rule_ID || "",
-            ident: { "#text": vulnData.Rule_ID || "", "@_system": "http://iase.disa.mil/cci" },
-            fixtext: { "#text": vulnData.Fix_Text || "", "@_fixref": "" },
-            fix: { "@_id": "" },
-            check: { 
-              "check-content-ref": { "@_href": "", "@_name": "" }, 
-              "check-content": vulnData.Check_Content || "", 
-              "@_system": "" 
-            },
-            "@_id": vulnData.Rule_ID || "",
-            "@_weight": 0,
-            "@_severity": mapSeverity(vuln.SEVERITY || "unknown")
-          }
-        };
-      });
-    } else {
-      // If there are no vulnerabilities, create an empty array
-      benchmark.Group = [];
+    ASSET: Asset;
+  };
+}): Promise<ParsedXml> {
+  try {
+    // Validate CKL data structure
+    if (!cklData.CHECKLIST?.STIGS?.iSTIG) {
+      throw new Error("Invalid CKL format: Missing required STIGS structure");
     }
-    
-    // Return the benchmark wrapped in a ParsedXml structure
-    return { Benchmark: benchmark };
+
+    const stigInfo = cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO;
+    const vulnerabilities = cklData.CHECKLIST.STIGS.iSTIG.VULN || [];
+
+    // Create benchmark object
+    const benchmark: ParsedXml = {
+      Benchmark: {
+        "@_xmlns:xccdf": "http://checklists.nist.gov/xccdf/1.1",
+        "@_xmlns:xhtml": "http://www.w3.org/1999/xhtml",
+        "@_xmlns:dc": "http://purl.org/dc/elements/1.1/",
+        "@_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+        "@_xsi:schemaLocation": "http://checklists.nist.gov/xccdf/1.1 xccdf_checklist.1.1.xsd",
+        "@_id": stigInfo.STIG_ID || "benchmark-1",
+        "plain-text": {
+          "#text": stigInfo.VERSION || "1.0"
+        },
+        title: stigInfo.TITLE || "STIG Benchmark",
+        description: stigInfo.DESCRIPTION || "",
+        status: {
+          "#text": stigInfo.RELEASE_INFO || "draft",
+          "@_date": new Date().toISOString()
+        },
+        reference: {
+          "#text": stigInfo.SOURCE || "",
+          "@_href": ""
+        },
+        Group: vulnerabilities.map((vuln: Vulnerability) => {
+          const stigData = vuln.STIG_DATA.reduce((acc: Record<string, string>, curr: StigData) => {
+            acc[curr.VULN_ATTRIBUTE] = curr.ATTRIBUTE_DATA;
+            return acc;
+          }, {});
+
+          return {
+            "@_id": stigData.Vuln_Num,
+            title: stigData.Group_Title,
+            description: stigData.Vuln_Discuss,
+            Rule: {
+              "@_id": stigData.Rule_ID,
+              "@_severity": vuln.SEVERITY?.toLowerCase() || "medium",
+              version: stigData.Rule_Ver,
+              title: stigData.Rule_Title,
+              description: {
+                VulnDiscussion: stigData.Vuln_Discuss
+              },
+              check: {
+                "check-content": stigData.Check_Content
+              },
+              fixtext: {
+                "#text": stigData.Fix_Text
+              }
+            },
+            status: vuln.STATUS || "default",
+            findingDetails: vuln.FINDING_DETAILS || "",
+            comments: vuln.COMMENTS || ""
+          };
+        })
+      }
+    };
+
+    return benchmark;
   } catch (error) {
-    console.error("Error transforming CKL data:", error);
-    throw new Error("Failed to transform CKL data: " + (error instanceof Error ? error.message : String(error)));
+    console.error("Error transforming CKL to XML:", error);
+    throw error;
   }
 }
 
 // Define the ParsedXml interface
 interface ParsedXml {
   Benchmark: {
+    "@_xmlns:xccdf"?: string;
+    "@_xmlns:xhtml"?: string;
+    "@_xmlns:dc"?: string;
+    "@_xmlns:xsi"?: string;
+    "@_xsi:schemaLocation"?: string;
+    "@_id"?: string;
     title: string;
     description: string;
     "plain-text": { "#text": string };
@@ -243,48 +208,18 @@ interface ParsedXml {
       Rule: {
         version: string;
         title: string;
-        description: string;
-        reference: string;
-        ident: any;
-        fixtext: any;
-        fix: any;
-        check: any;
+        description: {
+          VulnDiscussion: string;
+        };
+        check: {
+          "check-content": string;
+        };
+        fixtext: {
+          "#text": string;
+        };
         "@_id": string;
-        "@_weight": number;
         "@_severity": string;
       };
     }>;
   };
-}
-
-// Helper function to map CKL severity to our severity format
-function mapSeverity(severity: string): "high" | "medium" | "low" | "unknown" {
-  if (!severity) return "unknown";
-  
-  const lowerSeverity = severity.toLowerCase();
-  if (lowerSeverity.includes("high") || lowerSeverity === "i") {
-    return "high";
-  } else if (lowerSeverity.includes("medium") || lowerSeverity === "ii") {
-    return "medium";
-  } else if (lowerSeverity.includes("low") || lowerSeverity === "iii") {
-    return "low";
-  }
-  
-  return "unknown";
-}
-
-// Helper function to map CKL status to our status format
-function mapStatus(status: string): "not applicable" | "not finding" | "open" | "default" {
-  if (!status) return "default";
-  
-  const lowerStatus = status.toLowerCase();
-  if (lowerStatus.includes("not applicable") || lowerStatus === "na") {
-    return "not applicable";
-  } else if (lowerStatus.includes("not finding") || lowerStatus === "nf") {
-    return "not finding";
-  } else if (lowerStatus.includes("open") || lowerStatus === "o") {
-    return "open";
-  }
-  
-  return "default";
 } 

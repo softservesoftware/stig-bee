@@ -698,98 +698,101 @@ export function XmlViewer() {
   };
 
   // Function to convert to CKL format
-  const convertToCKL = () => {
-    if (!parsedXml) return;
+  const convertToCkl = (data: ParsedXml) => {
+    const benchmark = data.Benchmark;
 
-    const benchmark = parsedXml.Benchmark;
-    const groups = benchmark.Group;
+    const cklData = {
+      CHECKLIST: {
+        "@_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+        "@_xmlns:dsig": "http://www.w3.org/2000/09/xmldsig#",
+        "@_xmlns": "http://checklists.nist.gov/xccdf/1.1",
+        "@_xsi:schemaLocation": "http://checklists.nist.gov/xccdf/1.1 xccdf_checklist.1.1.xsd",
+        ASSET: {
+          ROLE: "None",
+          ASSET_TYPE: "Computing",
+          HOST_NAME: "",
+          HOST_IP: "",
+          HOST_MAC: "",
+          HOST_FQDN: "",
+          TECH_AREA: "",
+          TARGET_KEY: "",
+          WEB_OR_DATABASE: "false",
+          WEB_DB_SITE: "",
+          WEB_DB_INSTANCE: "",
+          TARGET_COMMENT: benchmark.description || "",
+        },
+        STIGS: {
+          iSTIG: {
+            "@_version": "1.0",
+            STIG_INFO: {
+              VERSION: benchmark["plain-text"]["#text"] || "",
+              CLASSIFICATION: "UNCLASSIFIED",
+              STIG_ID: "",
+              TITLE: benchmark.title || "",
+              DESCRIPTION: "",
+              FILENAME: "",
+              RELEASE_INFO: benchmark.status["#text"] || "",
+              SEVERITY: "medium",
+              STIG_UUID: "",
+              NOTICE: "",
+              SOURCE: benchmark.reference["#text"] || "",
+              STIG_VIEWER_VERSION: "1.0",
+            },
+            VULN: benchmark.Group.map((group) => {
+              const status = groupFields[group["@_id"]]?.status || group.status || "default";
+              const findingDetails = groupFields[group["@_id"]]?.findingDetails || group.findingDetails || "";
+              const comments = groupFields[group["@_id"]]?.comments || group.comments || "";
 
-    // Create CKL XML structure
-    const cklXml = `<?xml version="1.0" encoding="UTF-8"?>
-<CHECKLIST>
-  <ASSET>
-    <ROLE>None</ROLE>
-    <ASSET_TYPE>Computing</ASSET_TYPE>
-    <MARKING>UNCLASSIFIED</MARKING>
-    <HOST_NAME>${benchmark.title}</HOST_NAME>
-    <HOST_IP>Unknown</HOST_IP>
-    <HOST_MAC>Unknown</HOST_MAC>
-    <HOST_FQDN>Unknown</HOST_FQDN>
-    <TARGET_COMMENT>${benchmark.description}</TARGET_COMMENT>
-  </ASSET>
-  <STIGS>
-    <iSTIG>
-      <STIG_INFO>
-        <VERSION>${benchmark["plain-text"]["#text"]}</VERSION>
-        <TITLE>${benchmark.title}</TITLE>
-        <RELEASE_INFO>${benchmark.status["#text"]}</RELEASE_INFO>
-        <SOURCE>${benchmark.reference["#text"]}</SOURCE>
-      </STIG_INFO>
-      ${groups.map(group => {
-        const groupId = group["@_id"];
-        const fields = groupFields[groupId] || {
-          status: "default",
-          findingDetails: "",
-          comments: ""
-        };
-        
-        return `
-      <VULN>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Vuln_Num</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group["@_id"]}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Severity</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule["@_severity"]?.toUpperCase() || "UNKNOWN"}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Group_Title</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.title}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Rule_ID</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule["@_id"]}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Rule_Ver</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule.version}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Rule_Title</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule.title}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Vuln_Discuss</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${renderDescription(group.Rule.description)?.VulnDiscussion || "No discussion available"}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Check_Content</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule.check["check-content"] || "No check content available"}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STIG_DATA>
-          <VULN_ATTRIBUTE>Fix_Text</VULN_ATTRIBUTE>
-          <ATTRIBUTE_DATA>${group.Rule.fixtext["#text"] || "No fix text available"}</ATTRIBUTE_DATA>
-        </STIG_DATA>
-        <STATUS>${fields.status.toUpperCase()}</STATUS>
-        <FINDING_DETAILS>${fields.findingDetails}</FINDING_DETAILS>
-        <COMMENTS>${fields.comments}</COMMENTS>
-      </VULN>`;
-      }).join('')}
-    </iSTIG>
-  </STIGS>
-</CHECKLIST>`;
+              return {
+                "@_status": status,
+                STIG_DATA: [
+                  {
+                    VULN_ATTRIBUTE: "Vuln_Num",
+                    ATTRIBUTE_DATA: group["@_id"],
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Group_Title",
+                    ATTRIBUTE_DATA: group.title,
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Rule_ID",
+                    ATTRIBUTE_DATA: group.Rule["@_id"],
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Rule_Ver",
+                    ATTRIBUTE_DATA: group.Rule.version,
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Rule_Title",
+                    ATTRIBUTE_DATA: group.Rule.title,
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Vuln_Discuss",
+                    ATTRIBUTE_DATA: group.description,
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Check_Content",
+                    ATTRIBUTE_DATA: group.Rule.check["check-content"],
+                  },
+                  {
+                    VULN_ATTRIBUTE: "Fix_Text",
+                    ATTRIBUTE_DATA: group.Rule.fixtext["#text"],
+                  },
+                ],
+                STATUS: status,
+                FINDING_DETAILS: findingDetails,
+                COMMENTS: comments,
+                SEVERITY: group.Rule["@_severity"],
+                SEVERITY_OVERRIDE: "",
+                SEVERITY_JUSTIFICATION: "",
+              };
+            }),
+          },
+        },
+      },
+    };
 
-    // Create and trigger download
-    const blob = new Blob([cklXml], { type: 'text/xml' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${benchmark.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.ckl`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    return cklData;
   };
 
   // Function to clear all current data
@@ -853,7 +856,79 @@ export function XmlViewer() {
               </div>
               {xmlContent && parsedXml && (
                 <div className="mt-4 space-y-2">
-                  <Button onClick={convertToCKL} className="w-full">
+                  <Button onClick={() => {
+                    const cklData = convertToCkl(parsedXml);
+                    
+                    // Convert the CKL data to XML format
+                    const xmlString = `<?xml version="1.0" encoding="UTF-8"?>
+<CHECKLIST xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dsig="http://www.w3.org/2000/09/xmldsig#" xmlns="http://checklists.nist.gov/xccdf/1.1" xsi:schemaLocation="http://checklists.nist.gov/xccdf/1.1 xccdf_checklist.1.1.xsd">
+  <ASSET>
+    <ROLE>${cklData.CHECKLIST.ASSET.ROLE}</ROLE>
+    <ASSET_TYPE>${cklData.CHECKLIST.ASSET.ASSET_TYPE}</ASSET_TYPE>
+    <HOST_NAME>${cklData.CHECKLIST.ASSET.HOST_NAME}</HOST_NAME>
+    <HOST_IP>${cklData.CHECKLIST.ASSET.HOST_IP}</HOST_IP>
+    <HOST_MAC>${cklData.CHECKLIST.ASSET.HOST_MAC}</HOST_MAC>
+    <HOST_FQDN>${cklData.CHECKLIST.ASSET.HOST_FQDN}</HOST_FQDN>
+    <TECH_AREA>${cklData.CHECKLIST.ASSET.TECH_AREA}</TECH_AREA>
+    <TARGET_KEY>${cklData.CHECKLIST.ASSET.TARGET_KEY}</TARGET_KEY>
+    <WEB_OR_DATABASE>${cklData.CHECKLIST.ASSET.WEB_OR_DATABASE}</WEB_OR_DATABASE>
+    <WEB_DB_SITE>${cklData.CHECKLIST.ASSET.WEB_DB_SITE}</WEB_DB_SITE>
+    <WEB_DB_INSTANCE>${cklData.CHECKLIST.ASSET.WEB_DB_INSTANCE}</WEB_DB_INSTANCE>
+    <TARGET_COMMENT>${cklData.CHECKLIST.ASSET.TARGET_COMMENT}</TARGET_COMMENT>
+  </ASSET>
+  <STIGS>
+    <iSTIG version="${cklData.CHECKLIST.STIGS.iSTIG['@_version']}">
+      <STIG_INFO>
+        <VERSION>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.VERSION}</VERSION>
+        <CLASSIFICATION>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.CLASSIFICATION}</CLASSIFICATION>
+        <STIG_ID>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.STIG_ID}</STIG_ID>
+        <TITLE>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.TITLE}</TITLE>
+        <DESCRIPTION>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.DESCRIPTION}</DESCRIPTION>
+        <FILENAME>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.FILENAME}</FILENAME>
+        <RELEASE_INFO>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.RELEASE_INFO}</RELEASE_INFO>
+        <SEVERITY>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.SEVERITY}</SEVERITY>
+        <STIG_UUID>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.STIG_UUID}</STIG_UUID>
+        <NOTICE>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.NOTICE}</NOTICE>
+        <SOURCE>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.SOURCE}</SOURCE>
+        <STIG_VIEWER_VERSION>${cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO.STIG_VIEWER_VERSION}</STIG_VIEWER_VERSION>
+      </STIG_INFO>
+      ${cklData.CHECKLIST.STIGS.iSTIG.VULN.map(vuln => `
+      <VULN status="${vuln['@_status']}">
+        ${vuln.STIG_DATA.map(data => `
+        <STIG_DATA>
+          <VULN_ATTRIBUTE>${data.VULN_ATTRIBUTE}</VULN_ATTRIBUTE>
+          <ATTRIBUTE_DATA>${data.ATTRIBUTE_DATA}</ATTRIBUTE_DATA>
+        </STIG_DATA>`).join('')}
+        <STATUS>${vuln.STATUS}</STATUS>
+        <FINDING_DETAILS>${vuln.FINDING_DETAILS}</FINDING_DETAILS>
+        <COMMENTS>${vuln.COMMENTS}</COMMENTS>
+        <SEVERITY>${vuln.SEVERITY}</SEVERITY>
+        <SEVERITY_OVERRIDE>${vuln.SEVERITY_OVERRIDE}</SEVERITY_OVERRIDE>
+        <SEVERITY_JUSTIFICATION>${vuln.SEVERITY_JUSTIFICATION}</SEVERITY_JUSTIFICATION>
+      </VULN>`).join('')}
+    </iSTIG>
+  </STIGS>
+</CHECKLIST>`;
+                    
+                    // Create a Blob with the XML data
+                    const blob = new Blob([xmlString], { type: 'application/xml' });
+                    
+                    // Create a URL for the Blob
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Create a temporary link element
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'stig-checklist.ckl';
+                    
+                    // Append the link to the document, click it, and remove it
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // Release the URL
+                    URL.revokeObjectURL(url);
+                  }} className="w-full">
                     <Download className="mr-2 h-4 w-4" />
                     Save as CKL
                   </Button>
