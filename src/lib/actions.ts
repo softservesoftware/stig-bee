@@ -12,6 +12,8 @@ interface Vulnerability {
   STIG_DATA: StigData[];
   STATUS?: string;
   SEVERITY?: string;
+  FINDING_DETAILS?: string;
+  COMMENTS?: string;
 }
 
 interface StigInfo {
@@ -60,19 +62,43 @@ export async function uploadXmlFile(formData: FormData) {
       trimValues: true,
     });
     
-    const parsedXml = parser.parse(fileContent);
+    let parsedXml;
+    try {
+      parsedXml = parser.parse(fileContent);
+    } catch (parseError) {
+      console.error("Error parsing XML:", parseError);
+      return { error: "Failed to parse XML file. Please check if it's a valid XML file." };
+    }
     
     // If it's a CKL file, we need to transform it to match our expected format
     if (file.name.endsWith(".ckl")) {
       // Check if it's a CKL file by looking for the CHECKLIST root element
       if (parsedXml.CHECKLIST) {
-        // Transform CKL to our expected format
-        const transformedXml = transformCklToXml(parsedXml);
-        return {
-          rawXml: fileContent,
-          parsedXml: transformedXml,
-        };
+        try {
+          // Transform CKL to our expected format
+          const transformedXml = transformCklToXml(parsedXml);
+          
+          // Validate the transformed XML
+          if (!transformedXml.Benchmark || !transformedXml.Benchmark.Group) {
+            return { error: "Invalid CKL structure after transformation" };
+          }
+          
+          return {
+            rawXml: fileContent,
+            parsedXml: transformedXml,
+          };
+        } catch (transformError) {
+          console.error("Error transforming CKL:", transformError);
+          return { error: `Failed to transform CKL file: ${transformError instanceof Error ? transformError.message : String(transformError)}` };
+        }
+      } else {
+        return { error: "The file does not appear to be a valid CKL file (missing CHECKLIST element)" };
       }
+    }
+    
+    // For regular XML files, validate the structure
+    if (!parsedXml.Benchmark || !parsedXml.Benchmark.Group) {
+      return { error: "The XML file does not contain the expected Benchmark and Group elements" };
     }
     
     return {
@@ -81,16 +107,25 @@ export async function uploadXmlFile(formData: FormData) {
     };
   } catch (error) {
     console.error("Error processing file:", error);
-    return { error: "Failed to process file. Please check if it's a valid XML or CKL file." };
+    return { error: `Failed to process file: ${error instanceof Error ? error.message : String(error)}` };
   }
 }
 
 // Function to transform CKL format to our expected XML format
-function transformCklToXml(cklData: CklData) {
+function transformCklToXml(cklData: CklData): ParsedXml {
   try {
+    // Validate the CKL data structure
+    if (!cklData.CHECKLIST || !cklData.CHECKLIST.STIGS || !cklData.CHECKLIST.STIGS.iSTIG) {
+      throw new Error("Invalid CKL structure: Missing required elements");
+    }
+    
     // Extract STIG information
     const stigInfo = cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO;
     const asset = cklData.CHECKLIST.ASSET;
+    
+    if (!stigInfo || !asset) {
+      throw new Error("Invalid CKL structure: Missing STIG_INFO or ASSET");
+    }
     
     // Create a Benchmark object that matches our expected format
     const benchmark = {
@@ -109,9 +144,21 @@ function transformCklToXml(cklData: CklData) {
         title: string;
         description: string;
         "@_id": string;
+        status?: string;
+        findingDetails?: string;
+        comments?: string;
         Rule: {
-          severity: string;
-          status: string;
+          version: string;
+          title: string;
+          description: string;
+          reference: string;
+          ident: any;
+          fixtext: any;
+          fix: any;
+          check: any;
+          "@_id": string;
+          "@_weight": number;
+          "@_severity": string;
         };
       }>
     };
@@ -133,24 +180,81 @@ function transformCklToXml(cklData: CklData) {
           });
         }
         
+        // Extract status, finding details, and comments
+        const status = vuln.STATUS ? mapStatus(vuln.STATUS) : "default";
+        const findingDetails = vuln.FINDING_DETAILS || "";
+        const comments = vuln.COMMENTS || "";
+        
         // Create a Group object that matches our expected format
         return {
           title: vulnData.Group_Title || "Unknown Group",
-          description: "",
+          description: vulnData.Vuln_Discuss || "",
           "@_id": vulnData.Vuln_Num || `V-${Math.floor(Math.random() * 10000)}`,
+          status: status,
+          findingDetails: findingDetails,
+          comments: comments,
           Rule: {
-            severity: mapSeverity(vuln.SEVERITY || "unknown"),
-            status: mapStatus(vuln.STATUS || "default")
+            version: vulnData.Rule_Ver || "1.0",
+            title: vulnData.Rule_Title || "Unknown Rule",
+            description: vulnData.Vuln_Discuss || "",
+            reference: vulnData.Rule_ID || "",
+            ident: { "#text": vulnData.Rule_ID || "", "@_system": "http://iase.disa.mil/cci" },
+            fixtext: { "#text": vulnData.Fix_Text || "", "@_fixref": "" },
+            fix: { "@_id": "" },
+            check: { 
+              "check-content-ref": { "@_href": "", "@_name": "" }, 
+              "check-content": vulnData.Check_Content || "", 
+              "@_system": "" 
+            },
+            "@_id": vulnData.Rule_ID || "",
+            "@_weight": 0,
+            "@_severity": mapSeverity(vuln.SEVERITY || "unknown")
           }
         };
       });
+    } else {
+      // If there are no vulnerabilities, create an empty array
+      benchmark.Group = [];
     }
     
-    return benchmark;
+    // Return the benchmark wrapped in a ParsedXml structure
+    return { Benchmark: benchmark };
   } catch (error) {
     console.error("Error transforming CKL data:", error);
-    throw new Error("Failed to transform CKL data");
+    throw new Error("Failed to transform CKL data: " + (error instanceof Error ? error.message : String(error)));
   }
+}
+
+// Define the ParsedXml interface
+interface ParsedXml {
+  Benchmark: {
+    title: string;
+    description: string;
+    "plain-text": { "#text": string };
+    status: { "#text": string; "@_date": string };
+    reference: { "#text": string; "@_href": string };
+    Group: Array<{
+      title: string;
+      description: string;
+      "@_id": string;
+      status?: string;
+      findingDetails?: string;
+      comments?: string;
+      Rule: {
+        version: string;
+        title: string;
+        description: string;
+        reference: string;
+        ident: any;
+        fixtext: any;
+        fix: any;
+        check: any;
+        "@_id": string;
+        "@_weight": number;
+        "@_severity": string;
+      };
+    }>;
+  };
 }
 
 // Helper function to map CKL severity to our severity format
@@ -178,7 +282,9 @@ function mapStatus(status: string): "not applicable" | "not finding" | "open" | 
     return "not applicable";
   } else if (lowerStatus.includes("not finding") || lowerStatus === "nf") {
     return "not finding";
+  } else if (lowerStatus.includes("open") || lowerStatus === "o") {
+    return "open";
   }
   
-  return "open";
+  return "default";
 } 

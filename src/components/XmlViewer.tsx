@@ -395,8 +395,35 @@ export function XmlViewer() {
         return;
       }
 
+      // Validate the parsed XML structure
+      if (!result.parsedXml || !result.parsedXml.Benchmark || !result.parsedXml.Benchmark.Group) {
+        setError("Invalid XML structure. The file does not contain the expected Benchmark and Group elements.");
+        return;
+      }
+
       setXmlContent(result.rawXml || null);
       setParsedXml(result.parsedXml || null);
+      
+      // Initialize groupFields with data from the parsed XML
+      if (result.parsedXml.Benchmark.Group) {
+        const initialGroupFields: Record<string, {
+          status: "not applicable" | "not finding" | "open" | "default";
+          findingDetails: string;
+          comments: string;
+        }> = {};
+        
+        result.parsedXml.Benchmark.Group.forEach((group: Group) => {
+          const groupId = group["@_id"];
+          initialGroupFields[groupId] = {
+            status: group.status || "default",
+            findingDetails: group.findingDetails || "",
+            comments: group.comments || ""
+          };
+        });
+        
+        setGroupFields(initialGroupFields);
+      }
+      
       console.log(JSON.stringify(result.parsedXml));
     } catch (err) {
       setError("Failed to process XML file. Please try again.");
@@ -415,7 +442,7 @@ export function XmlViewer() {
 
   // Function to filter and sort groups
   const getFilteredAndSortedGroups = () => {
-    if (!parsedXml?.Benchmark.Group) return [];
+    if (!parsedXml?.Benchmark?.Group) return [];
     
     let filteredGroups = [...parsedXml.Benchmark.Group];
     
@@ -443,7 +470,8 @@ export function XmlViewer() {
     if (statusFilter !== "all") {
       filteredGroups = filteredGroups.filter(group => {
         const groupId = group["@_id"];
-        const status = groupFields[groupId]?.status;
+        // Use status from the group object if available, otherwise use from groupFields
+        const status = group.status || groupFields[groupId]?.status;
         
         if (statusFilter === "default") {
           // Show items that don't have a status set yet
@@ -530,10 +558,12 @@ export function XmlViewer() {
   // Function to render a single group card
   const renderGroupCard = (group: Group) => {
     const groupId = group["@_id"];
-    const currentFields = groupFields[groupId] || {
-      status: "default",
-      findingDetails: "",
-      comments: ""
+    
+    // Use status from the group object if available, otherwise use from groupFields
+    const currentFields = {
+      status: group.status || groupFields[groupId]?.status || "default",
+      findingDetails: group.findingDetails || groupFields[groupId]?.findingDetails || "",
+      comments: group.comments || groupFields[groupId]?.comments || ""
     };
     
     // Determine if this card has unsaved changes
@@ -970,7 +1000,7 @@ export function XmlViewer() {
         </Card>
       )}
 
-      {xmlContent && parsedXml && (
+      {xmlContent && parsedXml && parsedXml.Benchmark && parsedXml.Benchmark.Group && (
         <>
           <StatisticsCard 
             groups={parsedXml.Benchmark.Group} 
