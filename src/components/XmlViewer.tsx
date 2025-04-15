@@ -269,6 +269,8 @@ export function XmlViewer() {
 
   // Load saved data from localStorage on component mount
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const savedXmlContent = localStorage.getItem("xmlContent");
     const savedParsedXml = localStorage.getItem("parsedXml");
     const savedCklData = localStorage.getItem("cklData");
@@ -332,6 +334,8 @@ export function XmlViewer() {
 
   // Save data to localStorage when it changes
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     if (xmlContent && parsedXml) {
       localStorage.setItem("xmlContent", xmlContent);
       localStorage.setItem("parsedXml", JSON.stringify(parsedXml));
@@ -348,6 +352,8 @@ export function XmlViewer() {
 
   // Save filters to localStorage when they change
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const filters = {
       searchTerm,
       severityFilter,
@@ -361,6 +367,8 @@ export function XmlViewer() {
 
   // Save group fields to localStorage when they change
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     localStorage.setItem("groupFields", JSON.stringify(groupFields));
   }, [groupFields]);
 
