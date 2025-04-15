@@ -15,7 +15,7 @@ import {
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
-  SelectValue 
+  SelectValue
 } from "@/components/ui/select";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
@@ -463,20 +463,22 @@ export function XmlViewer() {
   // Function to handle saving a specific group's changes
   const handleSaveGroup = useCallback((groupId: string) => {
     // Get the current values from the DOM directly
-    const statusSelect = document.getElementById(`status-${groupId}`) as HTMLSelectElement;
     const findingDetailsTextarea = document.getElementById(`findingDetails-${groupId}`) as HTMLTextAreaElement;
     const commentsTextarea = document.getElementById(`comments-${groupId}`) as HTMLTextAreaElement;
     
-    if (!statusSelect || !findingDetailsTextarea || !commentsTextarea) return;
+    if (!findingDetailsTextarea || !commentsTextarea) return;
+    
+    // Get the current status from the groupFields state
+    const currentStatus = groupFields[groupId]?.status || "default";
     
     const changes = {
-      status: statusSelect.value as "not applicable" | "not finding" | "open" | "default",
+      status: currentStatus,
       findingDetails: findingDetailsTextarea.value,
       comments: commentsTextarea.value
     };
     
     saveChanges(groupId, changes);
-  }, [saveChanges]);
+  }, [groupFields, saveChanges]);
 
   // Function to parse XML content if it's a string
   const parseXmlString = (xmlString: string) => {
@@ -677,17 +679,23 @@ export function XmlViewer() {
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-2">Status</h4>
-                  <select
-                    id={`status-${groupId}`}
-                    className="w-full p-2 border rounded-md"
-                    defaultValue={currentFields.status}
-                    onChange={() => markCardAsChanged(groupId)}
+                  <Select
+                    value={currentFields.status}
+                    onValueChange={(value) => {
+                      markCardAsChanged(groupId);
+                      saveChanges(groupId, { status: value as "not applicable" | "not finding" | "open" | "default" });
+                    }}
                   >
-                    <option value="default">Default</option>
-                    <option value="not applicable">Not Applicable</option>
-                    <option value="not finding">Not Finding</option>
-                    <option value="open">Open</option>
-                  </select>
+                    <SelectTrigger id={`status-${groupId}`} className="w-full">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent className="w-full">
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="not applicable">Not Applicable</SelectItem>
+                      <SelectItem value="not finding">Not Finding</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -823,7 +831,7 @@ export function XmlViewer() {
   };
 
   return (
-    <div className="space-y-6 px-4">
+    <div className="space-y-6 px-4 min-w-full min-w-full overflow-x-hidden overflow-y-visible">
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
         <Card className="w-full lg:col-span-3">
           <CardHeader className="pb-2">
@@ -961,16 +969,16 @@ export function XmlViewer() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-full">
                     <Label htmlFor="severity">Severity Filter</Label>
                     <Select
                       value={severityFilter}
                       onValueChange={(value) => setSeverityFilter(value as Severity | "all")}
                     >
-                      <SelectTrigger id="severity">
+                      <SelectTrigger id="severity" className="w-full">
                         <SelectValue placeholder="Filter by severity" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-full">
                         <SelectItem value="all">All Severities</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
@@ -980,16 +988,16 @@ export function XmlViewer() {
                     </Select>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-full">
                     <Label htmlFor="status">Status Filter</Label>
                     <Select
                       value={statusFilter}
                       onValueChange={(value) => setStatusFilter(value as StatusFilter)}
                     >
-                      <SelectTrigger id="status">
+                      <SelectTrigger id="status" className="w-full">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-full">
                         <SelectItem value="all">All Statuses</SelectItem>
                         <SelectItem value="default">Default</SelectItem>
                         <SelectItem value="open">Open</SelectItem>
@@ -999,7 +1007,7 @@ export function XmlViewer() {
                     </Select>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-full">
                     <Label htmlFor="sort">Sort By</Label>
                     <div className="flex gap-2">
                       <Select
@@ -1009,7 +1017,7 @@ export function XmlViewer() {
                         <SelectTrigger id="sort" className="w-full">
                           <SelectValue placeholder="Sort by" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="w-full">
                           <SelectItem value="title">Title</SelectItem>
                           <SelectItem value="severity">Severity</SelectItem>
                           <SelectItem value="id">ID</SelectItem>
@@ -1025,16 +1033,16 @@ export function XmlViewer() {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-full">
                     <Label htmlFor="group">Group By</Label>
                     <Select
                       value={groupBy}
                       onValueChange={(value) => setGroupBy(value as GroupBy)}
                     >
-                      <SelectTrigger id="group">
+                      <SelectTrigger id="group" className="w-full">
                         <SelectValue placeholder="Group by" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="w-full">
                         <SelectItem value="none">No Grouping</SelectItem>
                         <SelectItem value="severity">Severity</SelectItem>
                       </SelectContent>
