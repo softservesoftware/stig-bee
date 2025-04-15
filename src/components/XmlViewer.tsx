@@ -835,7 +835,7 @@ export function XmlViewer() {
   };
 
   return (
-    <div className="space-y-6 px-4 min-w-full min-w-full overflow-x-hidden overflow-y-visible">
+    <div className="space-y-6 px-4 min-w-full min-w-full overflow-x-hidden overflow-y-visible mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
         <Card className="w-full lg:col-span-3">
           <CardHeader className="pb-2">

@@ -1,22 +1,11 @@
 import { XmlViewer } from "@/components/XmlViewer";
 import Link from "next/link";
 import Image from "next/image";
+import Nav from "@/components/nav";
 export default function Home() {
     return (
         <div className="">
-            <div className="flex items-center gap-2 m-4">
-                <Link href="/" className="hover:cursor-pointer flex items-center gap-2">
-                    <Image
-                        src="/logo-black.png"
-                        alt="StigBee Logo"
-                        width={40}
-                        height={40}
-                        className="object-contain rounded-lg"
-                    />
-                    <h1 className="text-4xl font-bold uppercase">Stigbee</h1>
-                </Link>
-
-            </div>
+            <Nav sticky={false} />
             <XmlViewer />
         </div>
     );

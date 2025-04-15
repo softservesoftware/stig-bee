@@ -4,40 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
 import { ArrowRight, Github, Terminal, Shield, Layers, Users, Database, RefreshCw, ShieldCheck, Plus } from "lucide-react";
-
+import Nav from "@/components/nav";
 export default function Home() {
   return (
     <main className="w-full min-h-screen bg-slate-950 text-white">
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-slate-950/80 backdrop-blur-md border-b border-slate-800 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <Image
-              src="/logo-white.png"
-              alt="StigBee Logo"
-              width={48}
-              height={48}
-              className="object-contain rounded-lg transition-transform group-hover:scale-105"
-            />
-            <h1 className="text-3xl font-bold text-white">
-              Stig<span className="text-amber-500">Bee</span>
-            </h1>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/checklist-editor">
-              <Button variant="ghost" className="text-white hover:bg-slate-900">
-                Editor
-              </Button>
-            </Link>
-            <a href="https://github.com/softservesoftware/stig-bee" target="_blank" rel="noopener noreferrer">
-              <Button variant="ghost" className="text-white hover:bg-slate-900">
-                <Github className="w-4 h-4 mr-2" />
-                GitHub
-              </Button>
-            </a>
-          </div>
-        </div>
-      </nav>
+      <Nav />
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4 md:px-8 max-w-6xl mx-auto">
