@@ -29,12 +29,4 @@ jobs:
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/stig-bee:${{ env.SHORT_SHA }}
           docker push ghcr.io/${{ github.repository_owner }}/stig-bee:latest
-      - name: Build the Docker_ecs image
-        run: |
-          docker build . --file Dockerfile_ecs \
-            --tag ghcr.io/${{ github.repository_owner }}/stig-bee:${{ env.SHORT_SHA }}-ecs \
-            --tag ghcr.io/${{ github.repository_owner }}/stig-bee:latest-ecs \
-      - name: Push the Docker_ecs image to GitHub Container Registry
-        run: |
-          docker push ghcr.io/${{ github.repository_owner }}/stig-bee:${{ env.SHORT_SHA }}-ecs
-          docker push ghcr.io/${{ github.repository_owner }}/stig-bee:latest-ecs
+      
