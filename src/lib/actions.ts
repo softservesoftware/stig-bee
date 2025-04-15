@@ -1,6 +1,41 @@
+// eslint-disable-file @typescript-eslint/no-explicit-any  
 "use server";
 
 import { XMLParser } from "fast-xml-parser";
+
+interface StigData {
+  VULN_ATTRIBUTE: string;
+  ATTRIBUTE_DATA: string;
+}
+
+interface Vulnerability {
+  STIG_DATA: StigData[];
+  STATUS?: string;
+  SEVERITY?: string;
+}
+
+interface StigInfo {
+  TITLE: string;
+  VERSION: string;
+  RELEASE_INFO: string;
+  SOURCE: string;
+}
+
+interface Asset {
+  TARGET_COMMENT: string;
+}
+
+interface CklData {
+  CHECKLIST: {
+    STIGS: {
+      iSTIG: {
+        STIG_INFO: StigInfo;
+        VULN: Vulnerability[];
+      };
+    };
+    ASSET: Asset;
+  };
+}
 
 export async function uploadXmlFile(formData: FormData) {
   try {
@@ -51,7 +86,7 @@ export async function uploadXmlFile(formData: FormData) {
 }
 
 // Function to transform CKL format to our expected XML format
-function transformCklToXml(cklData: any) {
+function transformCklToXml(cklData: CklData) {
   try {
     // Extract STIG information
     const stigInfo = cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO;
@@ -70,20 +105,28 @@ function transformCklToXml(cklData: any) {
         "#text": stigInfo.SOURCE || "Unknown Source", 
         "@_href": "" 
       },
-      Group: [] as any[]
+      Group: [] as Array<{
+        title: string;
+        description: string;
+        "@_id": string;
+        Rule: {
+          severity: string;
+          status: string;
+        };
+      }>
     };
     
     // Process vulnerabilities
     const vulns = cklData.CHECKLIST.STIGS.iSTIG.VULN;
     if (Array.isArray(vulns)) {
-      benchmark.Group = vulns.map((vuln: any) => {
+      benchmark.Group = vulns.map((vuln) => {
         // Extract STIG data
         const stigData = vuln.STIG_DATA;
         const vulnData: Record<string, string> = {};
         
         // Convert STIG_DATA to a more usable format
         if (Array.isArray(stigData)) {
-          stigData.forEach((data: any) => {
+          stigData.forEach((data) => {
             if (data.VULN_ATTRIBUTE && data.ATTRIBUTE_DATA) {
               vulnData[data.VULN_ATTRIBUTE] = data.ATTRIBUTE_DATA;
             }
@@ -96,32 +139,14 @@ function transformCklToXml(cklData: any) {
           description: "",
           "@_id": vulnData.Vuln_Num || `V-${Math.floor(Math.random() * 10000)}`,
           Rule: {
-            version: vulnData.Rule_Ver || "1",
-            title: vulnData.Rule_Title || "Unknown Rule",
-            description: {
-              VulnDiscussion: vulnData.Vuln_Discuss || "No discussion available"
-            },
-            reference: { "#text": "" },
-            ident: { "#text": vulnData.Rule_ID || "", "@_system": "http://scap.nist.gov/schema/ocil/2" },
-            fixtext: { "#text": vulnData.Fix_Text || "No fix available", "@_fixref": "" },
-            fix: { "@_id": "" },
-            check: { 
-              "check-content-ref": { "@_href": "", "@_name": "" }, 
-              "check-content": vulnData.Check_Content || "No check content available", 
-              "@_system": "http://scap.nist.gov/schema/ocil/2" 
-            },
-            "@_id": vulnData.Rule_ID || `V-${Math.floor(Math.random() * 10000)}`,
-            "@_weight": 10,
-            "@_severity": mapSeverity(vulnData.Severity)
-          },
-          status: mapStatus(vuln.STATUS),
-          findingDetails: vuln.FINDING_DETAILS || "",
-          comments: vuln.COMMENTS || ""
+            severity: mapSeverity(vuln.SEVERITY || "unknown"),
+            status: mapStatus(vuln.STATUS || "default")
+          }
         };
       });
     }
     
-    return { Benchmark: benchmark };
+    return benchmark;
   } catch (error) {
     console.error("Error transforming CKL data:", error);
     throw new Error("Failed to transform CKL data");

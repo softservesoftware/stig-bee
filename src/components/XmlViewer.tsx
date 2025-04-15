@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Upload, Search, Filter, SortAsc, SortDesc, Group, Download, Trash2 } from "lucide-react";
+import { Upload, Search, SortAsc, SortDesc, Group, Download, Trash2 } from "lucide-react";
 import { uploadXmlFile } from "@/lib/actions";
-import { copyToClipboard } from "@/lib/utils";
 import { XMLParser } from "fast-xml-parser";
 import { 
   Select, 
@@ -46,7 +45,7 @@ interface Rule {
   version: string;
   title: string;
   description: string;
-  reference: any;
+  reference: string;
   ident: Ident | Ident[];
   fixtext: { "#text": string; "@_fixref": string };
   fix: { "@_id": string };
@@ -203,10 +202,6 @@ export function XmlViewer() {
   const [parsedXml, setParsedXml] = useState<ParsedXml | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<{
-    raw: boolean;
-    parsed: boolean;
-  }>({ raw: false, parsed: false });
   
   // Reference to the file input element
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -308,16 +303,16 @@ export function XmlViewer() {
     localStorage.setItem("groupFields", JSON.stringify(groupFields));
   }, [groupFields]);
 
-  // Function to update group fields
-  const updateGroupField = (groupId: string, field: 'status' | 'findingDetails' | 'comments', value: string) => {
-    setGroupFields(prev => ({
-      ...prev,
-      [groupId]: {
-        ...prev[groupId],
-        [field]: value
-      }
-    }));
-  };
+  // // Function to update group fields
+  // const updateGroupField = (groupId: string, field: 'status' | 'findingDetails' | 'comments', value: string) => {
+  //   setGroupFields(prev => ({
+  //     ...prev,
+  //     [groupId]: {
+  //       ...prev[groupId],
+  //       [field]: value
+  //     }
+  //   }));
+  // };
 
   // Function to mark a card as having changes
   const markCardAsChanged = (groupId: string) => {
@@ -371,7 +366,7 @@ export function XmlViewer() {
   };
 
   // Function to render description content
-  function renderDescription(description: any) {
+  function renderDescription(description: string) {
     if (typeof description === "string") {
       if (isXmlString(description)) {
         const parsedDesc = parseXmlString(description);
@@ -590,7 +585,7 @@ export function XmlViewer() {
           </div>
           <div className="flex flex-wrap gap-2 mt-2">
             {Array.isArray(group.Rule.ident) ? 
-              group.Rule.ident.map((id: any, index: number) => (
+              group.Rule.ident.map((id: { "#text": string }, index: number) => (
                 <Badge key={index} variant="outline">{id["#text"]}</Badge>
               )) : 
               group.Rule.ident && (
@@ -844,7 +839,7 @@ export function XmlViewer() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will clear all current data including any changes you've made. This action cannot be undone.
+                          This will clear all current data including any changes you{"'"}ve made. This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
