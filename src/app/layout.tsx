@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "XML Viewer",
-  description: "A beautiful and modern XML viewer with server-side processing",
+  title: "Stig Bee",
+  description: "A beautiful and modern stig viewer",
 };
 
 export default function RootLayout({

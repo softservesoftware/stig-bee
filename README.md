@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# STIG Bee 🐝
 
-## Getting Started
+STIG Bee is an open-source tool that takes the sting out of STIGs (Security Technical Implementation Guides). It provides a user-friendly interface for managing and implementing security controls, making compliance more accessible and manageable.
 
-First, run the development server:
+## 🌟 Features
+
+- **Self-hosted Solution**: Run STIG Bee locally or in the cloud
+- **Cross-Platform**: Works on any system architecture
+- **Docker Support**: Easy deployment with a single Dockerfile
+- **Browser-Based Version**: Fully client-side hosted version available
+- **Open Source**: All code is freely available and open source
+
+## 🚀 Getting Started
+
+### Using Docker (Recommended)
+
+Pull and run the latest version:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker pull ghcr.io/softservesoftware/stig-bee:latest
+docker run -p 3000:3000 ghcr.io/softservesoftware/stig-bee:latest
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Local Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
+```bash
+git clone https://github.com/softservesoftware/stig-bee.git
+cd stig-bee
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Install dependencies:
+```bash
+npm install
+```
 
-## Learn More
+3. Start the development server:
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔧 Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+[Configuration details to be added]
 
-## Deploy on Vercel
+## 🤝 Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+We welcome contributions! Please feel free to submit a Pull Request.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 License
+
+[License information to be added]
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors who have helped make STIG Bee better
+- Special thanks to the open-source community
+
+## 📞 Support
+
+For support, please [open an issue](https://github.com/softservesoftware/stig-bee/issues) on our GitHub repository.
