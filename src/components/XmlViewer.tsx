@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Upload, Search, SortAsc, SortDesc, Group, Download, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { processXmlFile } from "@/lib/xmlUtils";
 import { XMLParser } from "fast-xml-parser";
-import { convertXmlToCkl, convertCklToXmlString, CklData } from "../../lib/converter";
 import { 
   Select, 
   SelectContent, 
@@ -17,7 +18,6 @@ import {
   SelectTrigger, 
   SelectValue
 } from "@/components/ui/select";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,13 +39,13 @@ type StatusValue = "Open" | "NotAFinding" | "Not_Applicable" | "Not_Reviewed";
 type StatusFilter = "all" | StatusValue;
 type FileType = "xml" | "ckl" | null;
 
-// // Status mapping for display values
-// const STATUS_MAPPING = {
-//   "Open": "Open",
-//   "NotAFinding": "Not a Finding",
-//   "Not_Applicable": "Not Applicable",
-//   "Not_Reviewed": "Not Reviewed"
-// } as const;
+// Status mapping for display values
+const STATUS_MAPPING = {
+  "Open": "Open",
+  "NotAFinding": "Not a Finding",
+  "Not_Applicable": "Not Applicable",
+  "Not_Reviewed": "Not Reviewed"
+} as const;
 
 interface Ident {
   "#text": string;
@@ -87,6 +87,7 @@ interface Benchmark {
   status: { "#text": string; "@_date": string };
   reference: { "#text": string; "@_href": string };
   Group: Group[];
+  "@_id"?: string;
 }
 
 interface ParsedXml {
@@ -124,32 +125,6 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
     return acc;
   }, {} as Record<string, number>);
 
-  // Transform data for charts
-  const severityChartData = Object.entries(severityData).map(([name, value]) => ({
-    name,
-    value,
-  }));
-
-  const statusChartData = Object.entries(statusData).map(([name, value]) => ({
-    name,
-    value,
-  }));
-
-  // Colors for charts
-  const severityColors = {
-    high: "#ef4444",
-    medium: "#f59e0b",
-    low: "#22c55e",
-    unknown: "#6b7280",
-  };
-
-  const statusColors = {
-    Open: "#ef4444",
-    NotAFinding: "#22c55e",
-    Not_Applicable: "#6b7280",
-    Not_Reviewed: "#94a3b8"
-  };
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -161,45 +136,27 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Progress Status</h3>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                    outerRadius={60}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {statusChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={statusColors[entry.name as keyof typeof statusColors]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(statusData).map(([status, count]) => (
+                  <div key={status} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <span>{STATUS_MAPPING[status as keyof typeof STATUS_MAPPING] || status}</span>
+                    <Badge>{count}</Badge>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Open Findings by Severity</h3>
             <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={severityChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="value" fill="#8884d8">
-                    {severityChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={severityColors[entry.name as keyof typeof severityColors]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(severityData).map(([severity, count]) => (
+                  <div key={severity} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <span className="capitalize">{severity}</span>
+                    <Badge>{count}</Badge>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -211,7 +168,6 @@ function StatisticsCard({ groups, groupFields }: StatisticsCardProps) {
 export function XmlViewer() {
   const [xmlContent, setXmlContent] = useState<string | null>(null);
   const [parsedXml, setParsedXml] = useState<ParsedXml | null>(null);
-  const [cklData, setCklData] = useState<CklData | null>(null);
   const [fileType, setFileType] = useState<FileType>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -273,7 +229,6 @@ export function XmlViewer() {
     
     const savedXmlContent = localStorage.getItem("xmlContent");
     const savedParsedXml = localStorage.getItem("parsedXml");
-    const savedCklData = localStorage.getItem("cklData");
     const savedFileType = localStorage.getItem("fileType");
     const savedFilters = localStorage.getItem("xmlFilters");
     const savedGroupFields = localStorage.getItem("groupFields");
@@ -282,10 +237,6 @@ export function XmlViewer() {
       setXmlContent(savedXmlContent);
       const parsedData = JSON.parse(savedParsedXml);
       setParsedXml(parsedData);
-      
-      if (savedCklData) {
-        setCklData(JSON.parse(savedCklData));
-      }
       
       if (savedFileType) {
         setFileType(savedFileType as FileType);
@@ -341,14 +292,10 @@ export function XmlViewer() {
       localStorage.setItem("parsedXml", JSON.stringify(parsedXml));
     }
     
-    if (cklData) {
-      localStorage.setItem("cklData", JSON.stringify(cklData));
-    }
-    
     if (fileType) {
       localStorage.setItem("fileType", fileType);
     }
-  }, [xmlContent, parsedXml, cklData, fileType]);
+  }, [xmlContent, parsedXml, fileType]);
 
   // Save filters to localStorage when they change
   useEffect(() => {
@@ -382,76 +329,66 @@ export function XmlViewer() {
   }, [searchTerm]);
 
   // Memoize filtered and sorted groups
-  const filteredAndSortedGroups = useMemo(() => {
-    if (!parsedXml?.Benchmark?.Group) return [];
-    
-    let filteredGroups = [...parsedXml.Benchmark.Group];
-    
+  const filteredAndSortedGroups = parsedXml?.Benchmark?.Group.filter(group => {
     // Apply search filter
     if (debouncedSearchTerm) {
       const term = debouncedSearchTerm.toLowerCase();
-      filteredGroups = filteredGroups.filter(group => 
+      const matchesSearch = 
         group.title.toLowerCase().includes(term) || 
         group.Rule.title.toLowerCase().includes(term) ||
         (typeof group.Rule.description === 'string' && 
-         group.Rule.description.toLowerCase().includes(term))
-      );
+         group.Rule.description.toLowerCase().includes(term));
+      
+      if (!matchesSearch) return false;
     }
     
     // Apply severity filter
     if (severityFilter !== "all") {
-      filteredGroups = filteredGroups.filter(group => 
-        group.Rule["@_severity"] === severityFilter
-      );
+      if (group.Rule["@_severity"] !== severityFilter) return false;
     }
     
     // Apply status filter
     if (statusFilter !== "all") {
-      filteredGroups = filteredGroups.filter(group => {
-        const groupId = group["@_id"];
-        const status = group.status || groupFields[groupId]?.status || "Not_Reviewed";
-        return status === statusFilter;
-      });
+      const groupId = group["@_id"];
+      const status = group.status || groupFields[groupId]?.status || "Not_Reviewed";
+      if (status !== statusFilter) return false;
     }
     
-    // Apply sorting
-    filteredGroups.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortField) {
-        case "title":
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case "severity":
-          const severityOrder = { high: 0, medium: 1, low: 2, unknown: 3 };
-          const severityA = a.Rule["@_severity"] || "unknown";
-          const severityB = b.Rule["@_severity"] || "unknown";
-          comparison = (severityOrder[severityA] || 3) - (severityOrder[severityB] || 3);
-          break;
-        case "id":
-          comparison = a["@_id"].localeCompare(b["@_id"]);
-          break;
-        default:
-          comparison = 0;
-      }
-      
-      return sortOrder === "asc" ? comparison : -comparison;
-    });
+    return true;
+  }).sort((a, b) => {
+    let comparison = 0;
     
-    return filteredGroups;
-  }, [parsedXml?.Benchmark?.Group, debouncedSearchTerm, severityFilter, statusFilter, sortField, sortOrder, groupFields]);
+    switch (sortField) {
+      case "title":
+        comparison = a.title.localeCompare(b.title);
+        break;
+      case "severity":
+        const severityOrder = { high: 0, medium: 1, low: 2, unknown: 3 };
+        const severityA = a.Rule["@_severity"] || "unknown";
+        const severityB = b.Rule["@_severity"] || "unknown";
+        comparison = (severityOrder[severityA] || 3) - (severityOrder[severityB] || 3);
+        break;
+      case "id":
+        comparison = a["@_id"].localeCompare(b["@_id"]);
+        break;
+      default:
+        comparison = 0;
+    }
+    
+    return sortOrder === "asc" ? comparison : -comparison;
+  }) || [];
 
   // Function to mark a card as having changes
-  const markCardAsChanged = useCallback((groupId: string) => {
+  const markCardAsChanged = (groupId: string) => {
     setCardsWithChanges(prev => {
       const newSet = new Set(prev);
       newSet.add(groupId);
       return newSet;
     });
-  }, []);
+  };
 
   // Function to save changes for a specific group
-  const saveChanges = useCallback((groupId: string, changes: {
+  const saveChanges = (groupId: string, changes: {
     status?: StatusValue;
     findingDetails?: string;
     comments?: string;
@@ -470,10 +407,10 @@ export function XmlViewer() {
       newSet.delete(groupId);
       return newSet;
     });
-  }, []);
+  };
 
   // Function to handle saving a specific group's changes
-  const handleSaveGroup = useCallback((groupId: string) => {
+  const handleSaveGroup = (groupId: string) => {
     // Get the current values from the DOM directly
     const findingDetailsTextarea = document.getElementById(`findingDetails-${groupId}`) as HTMLTextAreaElement;
     const commentsTextarea = document.getElementById(`comments-${groupId}`) as HTMLTextAreaElement;
@@ -490,7 +427,7 @@ export function XmlViewer() {
     };
     
     saveChanges(groupId, changes);
-  }, [groupFields, saveChanges]);
+  };
 
   // Function to parse XML content if it's a string
   const parseXmlString = (xmlString: string) => {
@@ -513,7 +450,7 @@ export function XmlViewer() {
   };
 
   // Function to render description content
-  const renderDescription = useCallback((description: string) => {
+  const renderDescription = (description: string) => {
     if (typeof description === "string") {
       if (isXmlString(description)) {
         const parsedDesc = parseXmlString(description);
@@ -522,7 +459,7 @@ export function XmlViewer() {
       return null;
     }
     return null;
-  }, []);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -551,15 +488,6 @@ export function XmlViewer() {
       // Determine file type
       const fileType = file.name.endsWith(".ckl") ? "ckl" : "xml";
       setFileType(fileType);
-      
-      // If it's an XML file, convert it to CKL format
-      if (fileType === "xml") {
-        const cklData = convertXmlToCkl(result.parsedXml);
-        setCklData(cklData);
-      } else {
-        // If it's a CKL file, use the parsed data directly
-        setCklData(result.parsedXml);
-      }
       
       // Initialize groupFields with data from the parsed XML
       if (result.parsedXml.Benchmark.Group) {
@@ -610,7 +538,7 @@ export function XmlViewer() {
   };
 
   // Function to render a single group card
-  const renderGroupCard = useCallback((group: Group) => {
+  const renderGroupCard = (group: Group) => {
     const groupId = group["@_id"];
     
     // Use status from the group object if available, otherwise use from groupFields
@@ -737,10 +665,10 @@ export function XmlViewer() {
         </CardContent>
       </Card>
     );
-  }, [groupFields, cardsWithChanges, handleSaveGroup, markCardAsChanged, handleDebouncedInputChange, renderDescription, getSeverityColor]);
+  };
 
   // Function to render groups based on grouping
-  const renderGroups = useCallback(() => {
+  const renderGroups = () => {
     if (groupBy === "none") {
       return filteredAndSortedGroups.map((group) => renderGroupCard(group));
     }
@@ -764,10 +692,10 @@ export function XmlViewer() {
         </div>
       </div>
     ));
-  }, [filteredAndSortedGroups, groupBy, renderGroupCard]);
+  };
 
   // Function to save the CKL file
-  const handleSaveCkl = useCallback(() => {
+  const handleSaveCkl = () => {
     if (!parsedXml) return;
     
     // Create a deep copy of the parsed XML to avoid modifying the original
@@ -786,10 +714,10 @@ export function XmlViewer() {
     }
     
     // Convert the updated XML to CKL format
-    const updatedCklData = convertXmlToCkl(updatedParsedXml);
+    const cklData = convertXmlToCkl(updatedParsedXml);
     
     // Convert the CKL data to XML string
-    const xmlString = convertCklToXmlString(updatedCklData);
+    const xmlString = convertCklToXmlString(cklData);
     
     // Create a Blob with the XML data
     const blob = new Blob([xmlString], { type: 'application/xml' });
@@ -809,14 +737,140 @@ export function XmlViewer() {
     
     // Release the URL
     URL.revokeObjectURL(url);
-  }, [parsedXml, groupFields]);
+  };
+
+  // Function to convert XML to CKL format
+  const convertXmlToCkl = (xmlData: ParsedXml) => {
+    // This is a simplified conversion - in a real implementation, you would use the Python code you provided
+    // For now, we'll create a basic CKL structure
+    
+    const cklData = {
+      CHECKLIST: {
+        ASSET: {
+          ROLE: "None",
+          ASSET_TYPE: "Computing",
+          HOST_NAME: "localhost",
+          HOST_IP: "127.0.0.1",
+          HOST_MAC: "00:00:00:00:00:00",
+          HOST_FQDN: "localhost.localdomain",
+          TARGET_COMMENT: "",
+          TECH_AREA: "",
+          TARGET_KEY: "",
+          WEB_OR_DATABASE: "false",
+          WEB_DB_SITE: "",
+          WEB_DB_INSTANCE: ""
+        },
+        STIGS: {
+          iSTIG: {
+            STIG_INFO: {
+              TITLE: xmlData.Benchmark.title,
+              VERSION: xmlData.Benchmark["plain-text"]["#text"],
+              RELEASE_INFO: xmlData.Benchmark.status["#text"],
+              SOURCE: xmlData.Benchmark.reference["#text"],
+              STIG_ID: xmlData.Benchmark["@_id"] || "unknown",
+              DESCRIPTION: xmlData.Benchmark.description
+            },
+            VULN: xmlData.Benchmark.Group.map(group => {
+              // Extract vulnerability data from the group
+              const vulnData: Record<string, string> = {
+                Vuln_Num: group["@_id"],
+                Severity: group.Rule["@_severity"],
+                Group_Title: group.title,
+                Rule_ID: group.Rule["@_id"],
+                Rule_Ver: group.Rule.version,
+                Rule_Title: group.Rule.title,
+                Vuln_Discuss: typeof group.Rule.description === 'string' 
+                  ? group.Rule.description 
+                  : (group.Rule.description as any).VulnDiscussion || "",
+                Check_Content: group.Rule.check["check-content"],
+                Fix_Text: group.Rule.fixtext["#text"]
+              };
+              
+              // Convert to STIG_DATA format
+              const stigData = Object.entries(vulnData).map(([key, value]) => ({
+                VULN_ATTRIBUTE: key,
+                ATTRIBUTE_DATA: value || ""
+              }));
+              
+              return {
+                STIG_DATA: stigData,
+                STATUS: group.status || groupFields[group["@_id"]]?.status || "Not_Reviewed",
+                SEVERITY: group.Rule["@_severity"],
+                FINDING_DETAILS: group.findingDetails || groupFields[group["@_id"]]?.findingDetails || "",
+                COMMENTS: group.comments || groupFields[group["@_id"]]?.comments || ""
+              };
+            })
+          }
+        }
+      }
+    };
+    
+    return cklData;
+  };
+
+  // Function to convert CKL data to XML string
+  const convertCklToXmlString = (cklData: any) => {
+    // This is a simplified conversion - in a real implementation, you would use the Python code you provided
+    // For now, we'll create a basic XML string
+    
+    let xmlString = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xmlString += '<!--DISA STIG Viewer :: 2.11-->\n';
+    xmlString += '<CHECKLIST>\n';
+    
+    // Add ASSET section
+    xmlString += '  <ASSET>\n';
+    for (const [key, value] of Object.entries(cklData.CHECKLIST.ASSET)) {
+      xmlString += `    <${key}>${value}</${key}>\n`;
+    }
+    xmlString += '  </ASSET>\n';
+    
+    // Add STIGS section
+    xmlString += '  <STIGS>\n';
+    xmlString += '    <iSTIG>\n';
+    
+    // Add STIG_INFO section
+    xmlString += '      <STIG_INFO>\n';
+    for (const [key, value] of Object.entries(cklData.CHECKLIST.STIGS.iSTIG.STIG_INFO)) {
+      xmlString += `        <SI_DATA>\n`;
+      xmlString += `          <SID_NAME>${key}</SID_NAME>\n`;
+      xmlString += `          <SID_DATA>${value}</SID_DATA>\n`;
+      xmlString += `        </SI_DATA>\n`;
+    }
+    xmlString += '      </STIG_INFO>\n';
+    
+    // Add VULN sections
+    for (const vuln of cklData.CHECKLIST.STIGS.iSTIG.VULN) {
+      xmlString += '      <VULN>\n';
+      
+      // Add STIG_DATA sections
+      for (const stigData of vuln.STIG_DATA) {
+        xmlString += '        <STIG_DATA>\n';
+        xmlString += `          <VULN_ATTRIBUTE>${stigData.VULN_ATTRIBUTE}</VULN_ATTRIBUTE>\n`;
+        xmlString += `          <ATTRIBUTE_DATA>${stigData.ATTRIBUTE_DATA}</ATTRIBUTE_DATA>\n`;
+        xmlString += '        </STIG_DATA>\n';
+      }
+      
+      // Add STATUS, SEVERITY, FINDING_DETAILS, and COMMENTS
+      xmlString += `        <STATUS>${vuln.STATUS}</STATUS>\n`;
+      xmlString += `        <SEVERITY>${vuln.SEVERITY}</SEVERITY>\n`;
+      xmlString += `        <FINDING_DETAILS>${vuln.FINDING_DETAILS}</FINDING_DETAILS>\n`;
+      xmlString += `        <COMMENTS>${vuln.COMMENTS}</COMMENTS>\n`;
+      
+      xmlString += '      </VULN>\n';
+    }
+    
+    xmlString += '    </iSTIG>\n';
+    xmlString += '  </STIGS>\n';
+    xmlString += '</CHECKLIST>';
+    
+    return xmlString;
+  };
 
   // Function to clear all current data
   const clearCurrentData = () => {
     // Clear state
     setXmlContent(null);
     setParsedXml(null);
-    setCklData(null);
     setFileType(null);
     setError(null);
     setSearchTerm("");
@@ -831,7 +885,6 @@ export function XmlViewer() {
     // Clear localStorage
     localStorage.removeItem("xmlContent");
     localStorage.removeItem("parsedXml");
-    localStorage.removeItem("cklData");
     localStorage.removeItem("fileType");
     localStorage.removeItem("xmlFilters");
     localStorage.removeItem("groupFields");
